@@ -6,20 +6,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.smartsplit.user.dto.LoginRequest;
-import com.smartsplit.auth.util.JwtUtil;
+import com.smartsplit.auth.util.JwtService;
 
 @Service
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-
-    private final JwtUtil jwtUtil;
+    private final JwtService jwtService;
 
     @Autowired
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtUtil = jwtUtil;
+        this.jwtService = jwtService;
     }
 
     public void register(SignupRequest request) {
@@ -41,6 +40,6 @@ public class UserService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new RuntimeException("Invalid email or password");
         }
-        return jwtUtil.generateToken(user.getEmail());
+        return jwtService.generateToken(user);
     }
 }

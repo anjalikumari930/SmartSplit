@@ -1,10 +1,9 @@
-package com.smartsplit.smartsplit;
+package com.smartsplit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import com.smartsplit.SmartsplitApplication;
 
-@SpringBootTest(classes = SmartsplitApplication.class)
+@SpringBootTest
 class SmartsplitApplicationTests {
 
 	@Test
