@@ -4,13 +4,13 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/smartsplit
-    username: postgres
+    username: meena
     password: Anjali123
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update # temporary for early dev
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:

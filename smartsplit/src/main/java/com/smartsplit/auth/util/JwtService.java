@@ -2,6 +2,7 @@ package com.smartsplit.auth.util;
 
 import com.smartsplit.user.User;
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
@@ -10,7 +11,9 @@ import java.util.Date;
 
 @Service
 public class JwtService {
-    private final Key secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    // IMPORTANT: In a real application, this key should be stored securely in application properties/environment variables
+    private static final String SECRET = "======================SmartSplitSecretKey=========================";
+    private final Key secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET));
     private final long expirationMs = 1000 * 60 * 60; // 1 hour
 
     public String generateToken(User user) {
