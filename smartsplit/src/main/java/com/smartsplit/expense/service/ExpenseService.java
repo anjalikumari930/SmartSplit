@@ -13,9 +13,12 @@ import com.smartsplit.exception.ResourceNotFoundException;
 import com.smartsplit.group.Group;
 import com.smartsplit.group.repository.GroupMemberRepository;
 import com.smartsplit.group.repository.GroupRepository;
+import com.smartsplit.notification.event.ExpenseCreatedEvent;
+import com.smartsplit.notification.event.ExpenseUpdatedEvent;
 import com.smartsplit.user.User;
 import com.smartsplit.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +40,7 @@ public class ExpenseService {
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final SplitStrategyFactory splitStrategyFactory;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ExpenseResponse createExpense(ExpenseRequest request) {
@@ -56,6 +60,18 @@ public class ExpenseService {
         attachSplitsToExpense(expense, splits);
 
         Expense savedExpense = expenseRepository.save(expense);
+
+        // Publish event
+        ExpenseCreatedEvent event = new ExpenseCreatedEvent(
+                this,
+                savedExpense.getId(),
+                savedExpense.getDescription(),
+                savedExpense.getAmount(),
+                savedExpense.getPaidBy().getId(),
+                savedExpense.getGroup().getId(),
+                savedExpense.getPaidBy().getName());
+        eventPublisher.publishEvent(event);
+
         return mapToResponse(savedExpense);
     }
 
@@ -92,6 +108,18 @@ public class ExpenseService {
         attachSplitsToExpense(expense, splits);
 
         Expense updatedExpense = expenseRepository.save(expense);
+
+        // Publish event
+        ExpenseUpdatedEvent event = new ExpenseUpdatedEvent(
+                this,
+                updatedExpense.getId(),
+                updatedExpense.getDescription(),
+                updatedExpense.getAmount(),
+                updatedExpense.getPaidBy().getId(),
+                updatedExpense.getGroup().getId(),
+                updatedExpense.getPaidBy().getName());
+        eventPublisher.publishEvent(event);
+
         return mapToResponse(updatedExpense);
     }
 
