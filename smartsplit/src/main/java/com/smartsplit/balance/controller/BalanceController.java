@@ -5,6 +5,11 @@ import com.smartsplit.balance.dto.BalanceResponse;
 import com.smartsplit.balance.dto.SettlementDetailResponse;
 import com.smartsplit.balance.service.BalanceService;
 import com.smartsplit.balance.service.SettlementService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -29,64 +34,59 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/groups/{groupId}")
 @RequiredArgsConstructor
+@Tag(name = "Balance & Settlement", description = "Balance and settlement calculation endpoints")
 public class BalanceController {
 
     private final BalanceService balanceService;
     private final SettlementService settlementService;
 
-    /**
-     * Get all balances for a group.
-     * 
-     * @param groupId UUID of the group
-     * @return BalanceDetailResponse containing all member balances
-     */
     @GetMapping("/balances")
-    public ResponseEntity<BalanceDetailResponse> getGroupBalances(@PathVariable UUID groupId) {
+    @Operation(summary = "Get all balances in a group", description = "Retrieve balance information for all members in a group")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved group balances")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @ApiResponse(responseCode = "404", description = "Group not found")
+    @SecurityRequirement(name = "Bearer Authentication")
+    public ResponseEntity<BalanceDetailResponse> getGroupBalances(@PathVariable @Parameter(description = "Group ID") UUID groupId) {
         log.info("Fetching balances for group: {}", groupId);
         BalanceDetailResponse response = balanceService.getGroupBalances(groupId);
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
-    /**
-     * Get balance for a specific user in a group.
-     * 
-     * @param groupId UUID of the group
-     * @param userId  UUID of the user
-     * @return BalanceResponse containing user's balance
-     */
     @GetMapping("/balances/{userId}")
+    @Operation(summary = "Get user balance in group", description = "Retrieve balance information for a specific user in a group")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved user balance")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @ApiResponse(responseCode = "404", description = "Group or user not found")
+    @SecurityRequirement(name = "Bearer Authentication")
     public ResponseEntity<BalanceResponse> getUserBalance(
-            @PathVariable UUID groupId,
-            @PathVariable UUID userId) {
+            @PathVariable @Parameter(description = "Group ID") UUID groupId,
+            @PathVariable @Parameter(description = "User ID") UUID userId) {
         log.info("Fetching balance for user {} in group {}", userId, groupId);
         BalanceResponse response = balanceService.getUserBalance(groupId, userId);
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
-    /**
-     * Get optimized settlement plan for a group.
-     * 
-     * @param groupId UUID of the group
-     * @return SettlementDetailResponse containing all settlement transactions
-     */
     @GetMapping("/settlements")
-    public ResponseEntity<SettlementDetailResponse> getGroupSettlements(@PathVariable UUID groupId) {
+    @Operation(summary = "Get optimized settlement plan", description = "Retrieve the optimized settlement plan for all members in a group")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved settlement plan")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @ApiResponse(responseCode = "404", description = "Group not found")
+    @SecurityRequirement(name = "Bearer Authentication")
+    public ResponseEntity<SettlementDetailResponse> getGroupSettlements(@PathVariable @Parameter(description = "Group ID") UUID groupId) {
         log.info("Fetching settlements for group: {}", groupId);
         SettlementDetailResponse response = settlementService.getGroupSettlements(groupId);
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
-    /**
-     * Get settlement transactions for a specific user in a group.
-     * 
-     * @param groupId UUID of the group
-     * @param userId  UUID of the user
-     * @return SettlementDetailResponse containing user's settlement transactions
-     */
     @GetMapping("/settlements/{userId}")
+    @Operation(summary = "Get user settlements", description = "Retrieve settlement transactions for a specific user in a group")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved user settlements")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @ApiResponse(responseCode = "404", description = "Group or user not found")
+    @SecurityRequirement(name = "Bearer Authentication")
     public ResponseEntity<SettlementDetailResponse> getUserSettlements(
-            @PathVariable UUID groupId,
-            @PathVariable UUID userId) {
+            @PathVariable @Parameter(description = "Group ID") UUID groupId,
+            @PathVariable @Parameter(description = "User ID") UUID userId) {
         log.info("Fetching settlements for user {} in group {}", userId, groupId);
         SettlementDetailResponse response = settlementService.getUserSettlements(groupId, userId);
         return ResponseEntity.status(HttpStatus.OK).body(response);

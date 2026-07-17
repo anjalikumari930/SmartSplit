@@ -27,3 +27,13 @@ application:
     jwt:
       secret-key: "MySuperSecureSecretKeyForJwt12345678901234567890"
       expiration: 86400000
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  show-actuator: false
