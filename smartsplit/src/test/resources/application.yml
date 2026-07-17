@@ -1,4 +1,7 @@
 spring:
+  application:
+    name: smartsplit
+
   datasource:
     url: jdbc:h2:mem:testdb
     driverClassName: org.h2.Driver
@@ -8,3 +11,9 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
+
+application:
+  security:
+    jwt:
+      secret-key: "MySuperSecureSecretKeyForJwt12345678901234567890"
+      expiration: 86400000

@@ -6,7 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.smartsplit.user.dto.LoginRequest;
-import com.smartsplit.auth.util.JwtService;
+import com.smartsplit.security.JwtService;
 
 @Service
 public class UserService {
@@ -40,6 +40,13 @@ public class UserService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new RuntimeException("Invalid email or password");
         }
-        return jwtService.generateToken(user);
+
+        org.springframework.security.core.userdetails.UserDetails userDetails = org.springframework.security.core.userdetails.User
+                .withUsername(user.getEmail())
+                .password(user.getPasswordHash())
+                .authorities("USER")
+                .build();
+
+        return jwtService.generateToken(userDetails);
     }
 }

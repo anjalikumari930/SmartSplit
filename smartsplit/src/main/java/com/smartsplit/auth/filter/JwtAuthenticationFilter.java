@@ -1,6 +1,6 @@
 package com.smartsplit.auth.filter;
 
-import com.smartsplit.auth.util.JwtService;
+import com.smartsplit.security.JwtService;
 import com.smartsplit.user.User;
 import com.smartsplit.user.UserRepository;
 import io.jsonwebtoken.JwtException;
@@ -25,6 +25,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -35,7 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             jwt = authHeader.substring(7);
             try {
-                email = jwtService.extractEmail(jwt);
+                email = jwtService.extractUsername(jwt);
             } catch (JwtException e) {
                 // Invalid token
             }
@@ -43,16 +44,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             Optional<User> userOpt = userRepository.findByEmail(email);
-            if (userOpt.isPresent() && jwtService.validateToken(jwt, userOpt.get())) {
+
+            // Check if user exists BEFORE calling get()
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
                 UserDetails userDetails = org.springframework.security.core.userdetails.User
-                        .withUsername(userOpt.get().getEmail())
-                        .password(userOpt.get().getPasswordHash())
+                        .withUsername(user.getEmail())
+                        .password(user.getPasswordHash())
                         .authorities("USER")
                         .build();
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                if (jwtService.isTokenValid(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
         }
         filterChain.doFilter(request, response);

@@ -4,7 +4,7 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/smartsplit
-    username: meena
+    username: postgres
     password: Anjali123
     driver-class-name: org.postgresql.Driver
 
@@ -20,3 +20,20 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    baseline-on-migrate: true
+
+application:
+  security:
+    jwt:
+      secret-key: "MySuperSecureSecretKeyForJwt12345678901234567890"
+      expiration: 86400000
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  show-actuator: false
