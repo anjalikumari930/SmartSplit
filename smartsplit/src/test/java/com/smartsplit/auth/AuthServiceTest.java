@@ -1,6 +1,6 @@
 package com.smartsplit.auth;
 
-import com.smartsplit.security.JwtService;
+import com.smartsplit.auth.util.JwtService;
 import com.smartsplit.user.User;
 import com.smartsplit.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
