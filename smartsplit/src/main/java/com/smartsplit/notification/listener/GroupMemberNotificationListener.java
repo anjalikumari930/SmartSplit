@@ -16,45 +16,47 @@ import java.util.List;
 @RequiredArgsConstructor
 public class GroupMemberNotificationListener {
 
-    private final NotificationService notificationService;
-    private final GroupMemberRepository groupMemberRepository;
+        private final NotificationService notificationService;
+        private final GroupMemberRepository groupMemberRepository;
 
-    @EventListener
-    @Async
-    public void onGroupMemberAdded(GroupMemberAddedEvent event) {
-        // Notify the newly added member
-        String newMemberTitle = "Welcome to Group";
-        String newMemberMessage = String.format(
-                "You have been added to the group '%s' by %s.",
-                event.getGroupName(),
-                event.getAddedByName());
-
-        notificationService.createNotification(
-                event.getNewMemberId(),
-                newMemberTitle,
-                newMemberMessage,
-                NotificationType.IN_APP);
-
-        // Notify existing group members about the new member
-        List<GroupMember> groupMembers = groupMemberRepository.findByGroupId(event.getGroupId());
-
-        for (GroupMember member : groupMembers) {
-            // Don't send notification to the newly added member or the person who added
-            // them
-            if (!member.getUser().getId().equals(event.getNewMemberId()) &&
-                    !member.getUser().getId().equals(event.getNewMemberId())) {
-                String title = "New Member Added";
-                String message = String.format(
-                        "%s has been added to the group '%s'.",
-                        event.getNewMemberName(),
-                        event.getGroupName());
+        @EventListener
+        @Async
+        public void onGroupMemberAdded(GroupMemberAddedEvent event) {
+                // Notify the newly added member
+                String newMemberTitle = "Welcome to Group";
+                String newMemberMessage = String.format(
+                                "You have been added to the group '%s' by %s.",
+                                event.getGroupName(),
+                                event.getAddedByName());
 
                 notificationService.createNotification(
-                        member.getUser().getId(),
-                        title,
-                        message,
-                        NotificationType.IN_APP);
-            }
+                                event.getNewMemberId(),
+                                newMemberTitle,
+                                newMemberMessage,
+                                NotificationType.IN_APP);
+
+                // Notify existing group members about the new member
+                List<GroupMember> groupMembers = groupMemberRepository.findByGroupId(event.getGroupId());
+
+                for (GroupMember member : groupMembers) {
+                        // Don't send notification to the newly added member or the person who added
+                        // them. This assumes `getAddedByUserId()` is added to the event.
+                        boolean isNewMember = member.getUser().getId().equals(event.getNewMemberId());
+                        boolean isUserWhoAdded = member.getUser().getId().equals(event.getAddedByUserId());
+
+                        if (!isNewMember && !isUserWhoAdded) {
+                                String title = "New Member Added";
+                                String message = String.format(
+                                                "%s has been added to the group '%s'.",
+                                                event.getNewMemberName(),
+                                                event.getGroupName());
+
+                                notificationService.createNotification(
+                                                member.getUser().getId(),
+                                                title,
+                                                message,
+                                                NotificationType.IN_APP);
+                        }
+                }
         }
-    }
 }

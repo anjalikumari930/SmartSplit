@@ -84,6 +84,7 @@ public class GroupService {
                                 this,
                                 savedGroupMember.getId(),
                                 user.getId(),
+                                currentUser.getId(),
                                 group.getId(),
                                 group.getName(),
                                 user.getName(),
