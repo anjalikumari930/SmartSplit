@@ -7,6 +7,7 @@ import java.util.UUID;
 public class GroupMemberAddedEvent extends ApplicationEvent {
     private final UUID groupMemberId;
     private final UUID newMemberId;
+    private final UUID addedByUserId;
     private final UUID groupId;
     private final String groupName;
     private final String newMemberName;
@@ -16,6 +17,7 @@ public class GroupMemberAddedEvent extends ApplicationEvent {
             Object source,
             UUID groupMemberId,
             UUID newMemberId,
+            UUID addedByUserId,
             UUID groupId,
             String groupName,
             String newMemberName,
@@ -23,6 +25,7 @@ public class GroupMemberAddedEvent extends ApplicationEvent {
         super(source);
         this.groupMemberId = groupMemberId;
         this.newMemberId = newMemberId;
+        this.addedByUserId = addedByUserId;
         this.groupId = groupId;
         this.groupName = groupName;
         this.newMemberName = newMemberName;
@@ -35,6 +38,10 @@ public class GroupMemberAddedEvent extends ApplicationEvent {
 
     public UUID getNewMemberId() {
         return newMemberId;
+    }
+
+    public UUID getAddedByUserId() {
+        return addedByUserId;
     }
 
     public UUID getGroupId() {
