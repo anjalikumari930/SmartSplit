@@ -15,8 +15,8 @@ public class GroupMemberAddedEvent extends ApplicationEvent {
 
     public GroupMemberAddedEvent(
             Object source,
-            groupMemberId,
-            newMemberId,
+            UUID groupMemberId,
+            UUID newMemberId,
             UUID addedByUserId,
             UUID groupId,
             String groupName,
