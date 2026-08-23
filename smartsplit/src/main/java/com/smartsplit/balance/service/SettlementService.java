@@ -10,11 +10,12 @@ import com.smartsplit.group.Group;
 import com.smartsplit.group.GroupMember;
 import com.smartsplit.group.repository.GroupMemberRepository;
 import com.smartsplit.group.repository.GroupRepository;
-import com.smartsplit.notification.event.SettlementCompletedEvent;
+import com.smartsplit.config.RabbitMqConfig;
+import com.smartsplit.notification.messaging.NotificationMessage;
 import com.smartsplit.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,7 +49,7 @@ public class SettlementService {
         private final GroupRepository groupRepository;
         private final GroupMemberRepository groupMemberRepository;
         private final SettlementRepository settlementRepository;
-        private final ApplicationEventPublisher eventPublisher;
+        private final RabbitTemplate rabbitTemplate;
 
         private static final BigDecimal ZERO = BigDecimal.ZERO;
 
@@ -167,17 +168,42 @@ public class SettlementService {
 
                 Settlement savedSettlement = settlementRepository.save(settlement);
 
-                // Publish event
-                SettlementCompletedEvent event = new SettlementCompletedEvent(
-                                this,
-                                savedSettlement.getId(),
+                publishNotification(
+                                "SETTLEMENT_COMPLETED",
                                 savedSettlement.getPayer().getId(),
+                                savedSettlement.getGroup().getId(),
+                                "Settlement Completed",
+                                String.format("You have settled $%.2f with %s.",
+                                                savedSettlement.getAmount(),
+                                                savedSettlement.getPayee().getName()),
+                                savedSettlement.getAmount());
+
+                publishNotification(
+                                "SETTLEMENT_RECEIVED",
                                 savedSettlement.getPayee().getId(),
-                                savedSettlement.getAmount(),
-                                savedSettlement.getPayer().getName(),
-                                savedSettlement.getPayee().getName());
-                eventPublisher.publishEvent(event);
+                                savedSettlement.getGroup().getId(),
+                                "Settlement Received",
+                                String.format("%s has settled $%.2f with you.",
+                                                savedSettlement.getPayer().getName(),
+                                                savedSettlement.getAmount()),
+                                savedSettlement.getAmount());
 
                 log.info("Settlement {} marked as completed", settlementId);
+        }
+
+        private void publishNotification(String eventType, UUID userId, UUID groupId, String title,
+                        String message, BigDecimal amount) {
+                NotificationMessage notificationMessage = new NotificationMessage(
+                                eventType,
+                                userId,
+                                groupId,
+                                title,
+                                message,
+                                amount);
+
+                rabbitTemplate.convertAndSend(
+                                RabbitMqConfig.EXCHANGE_NAME,
+                                RabbitMqConfig.NOTIFICATION_ROUTING_KEY,
+                                notificationMessage);
         }
 }

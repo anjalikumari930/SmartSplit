@@ -9,11 +9,12 @@ import com.smartsplit.group.dto.GroupMemberResponse;
 import com.smartsplit.group.dto.GroupResponse;
 import com.smartsplit.group.repository.GroupMemberRepository;
 import com.smartsplit.group.repository.GroupRepository;
-import com.smartsplit.notification.event.GroupMemberAddedEvent;
+import com.smartsplit.config.RabbitMqConfig;
+import com.smartsplit.notification.messaging.NotificationMessage;
 import com.smartsplit.user.User;
 import com.smartsplit.user.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +31,7 @@ public class GroupService {
         private final GroupRepository groupRepository;
         private final GroupMemberRepository groupMemberRepository;
         private final UserRepository userRepository;
-        private final ApplicationEventPublisher eventPublisher;
+        private final RabbitTemplate rabbitTemplate;
 
         @Transactional
         public GroupResponse createGroup(CreateGroupRequest request) {
@@ -79,17 +80,31 @@ public class GroupService {
 
                 GroupMember savedGroupMember = groupMemberRepository.save(groupMember);
 
-                // Publish event
-                GroupMemberAddedEvent event = new GroupMemberAddedEvent(
-                                this,
-                                savedGroupMember.getId(),
+                publishNotification(
+                                "GROUP_MEMBER_ADDED",
                                 user.getId(),
-                                currentUser.getId(),
                                 group.getId(),
-                                group.getName(),
-                                user.getName(),
-                                currentUser.getName());
-                eventPublisher.publishEvent(event);
+                                "Welcome to Group",
+                                String.format("You have been added to the group '%s' by %s.",
+                                                group.getName(),
+                                                currentUser.getName()),
+                                null);
+
+                List<GroupMember> groupMembers = groupMemberRepository.findByGroupId(group.getId());
+                for (GroupMember member : groupMembers) {
+                        if (!member.getUser().getId().equals(user.getId())
+                                        && !member.getUser().getId().equals(currentUser.getId())) {
+                                publishNotification(
+                                                "GROUP_MEMBER_ADDED",
+                                                member.getUser().getId(),
+                                                group.getId(),
+                                                "New Member Added",
+                                                String.format("%s has been added to the group '%s'.",
+                                                                user.getName(),
+                                                                group.getName()),
+                                                null);
+                        }
+                }
         }
 
         @Transactional(readOnly = true)
@@ -104,6 +119,22 @@ public class GroupService {
                                                 group.getCreatedBy().getId(),
                                                 group.getCreatedAt()))
                                 .collect(Collectors.toList());
+        }
+
+        private void publishNotification(String eventType, UUID userId, UUID groupId, String title,
+                        String message, java.math.BigDecimal amount) {
+                NotificationMessage notificationMessage = new NotificationMessage(
+                                eventType,
+                                userId,
+                                groupId,
+                                title,
+                                message,
+                                amount);
+
+                rabbitTemplate.convertAndSend(
+                                RabbitMqConfig.EXCHANGE_NAME,
+                                RabbitMqConfig.NOTIFICATION_ROUTING_KEY,
+                                notificationMessage);
         }
 
         @SuppressWarnings("unchecked")
