@@ -5,6 +5,9 @@ import com.smartsplit.notification.dto.NotificationResponse;
 import com.smartsplit.notification.service.NotificationService;
 import com.smartsplit.user.User;
 import com.smartsplit.user.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -26,10 +29,12 @@ public class NotificationController {
     private final UserRepository userRepository;
 
     @GetMapping
+    @Operation(summary = "Get user notifications")
+    @SecurityRequirement(name = "Bearer Authentication")
     public ResponseEntity<Page<NotificationResponse>> getUserNotifications(
             Authentication authentication,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @Parameter(description = "Page number", example = "0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10") @RequestParam(defaultValue = "10") int size) {
 
         UUID userId = extractUserIdFromAuth(authentication);
         Pageable pageable = PageRequest.of(page, size);

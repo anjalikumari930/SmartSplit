@@ -4,16 +4,18 @@ import com.smartsplit.balance.dto.SettlementDetailResponse;
 import com.smartsplit.balance.dto.SettlementResponse;
 import com.smartsplit.balance.entity.Settlement;
 import com.smartsplit.balance.repository.SettlementRepository;
-import com.smartsplit.balance.utility.SettlementAlgorithm;
+import com.smartsplit.balance.utility.SplitwiseSimplify;
 import com.smartsplit.exception.ResourceNotFoundException;
+import com.smartsplit.group.Group;
 import com.smartsplit.group.GroupMember;
 import com.smartsplit.group.repository.GroupMemberRepository;
 import com.smartsplit.group.repository.GroupRepository;
-import com.smartsplit.notification.event.SettlementCompletedEvent;
+import com.smartsplit.config.RabbitMqConfig;
+import com.smartsplit.notification.messaging.NotificationMessage;
 import com.smartsplit.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,11 +45,11 @@ import java.util.stream.Collectors;
 public class SettlementService {
 
         private final BalanceService balanceService;
-        private final SettlementAlgorithm settlementAlgorithm;
+        private final SplitwiseSimplify splitwiseSimplify;
         private final GroupRepository groupRepository;
         private final GroupMemberRepository groupMemberRepository;
         private final SettlementRepository settlementRepository;
-        private final ApplicationEventPublisher eventPublisher;
+        private final RabbitTemplate rabbitTemplate;
 
         private static final BigDecimal ZERO = BigDecimal.ZERO;
 
@@ -58,10 +60,10 @@ public class SettlementService {
          * @return SettlementDetailResponse containing all settlement transactions
          * @throws ResourceNotFoundException if group not found
          */
-        @Transactional(readOnly = true)
+        @Transactional
         public SettlementDetailResponse getGroupSettlements(UUID groupId) {
                 // Validate group exists
-                groupRepository.findById(groupId)
+                Group group = groupRepository.findById(groupId)
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "Group not found with id: " + groupId));
 
@@ -69,6 +71,7 @@ public class SettlementService {
                 List<GroupMember> groupMembers = groupMemberRepository.findByGroupId(groupId);
                 if (groupMembers.isEmpty()) {
                         log.warn("Group {} has no members", groupId);
+                        settlementRepository.deleteUnsettledByGroupId(groupId);
                         return new SettlementDetailResponse(groupId, List.of());
                 }
 
@@ -85,11 +88,36 @@ public class SettlementService {
                                                 gm -> gm.getUser().getId(),
                                                 GroupMember::getUser));
 
-                // Calculate optimized settlements
-                List<SettlementResponse> settlements = settlementAlgorithm.calculateSettlements(balances, userMap);
+                // Calculate optimized settlements (SplitwiseSimplify)
+                List<SettlementResponse> settlements = splitwiseSimplify.calculateSettlements(balances, userMap);
+                persistSettlements(group, settlements, userMap);
 
                 log.info("Calculated {} settlements for group {}", settlements.size(), groupId);
                 return new SettlementDetailResponse(groupId, settlements);
+        }
+
+        private void persistSettlements(Group group, List<SettlementResponse> settlements, Map<UUID, User> userMap) {
+                settlementRepository.deleteUnsettledByGroupId(group.getId());
+
+                for (SettlementResponse settlementResponse : settlements) {
+                        User payer = userMap.get(settlementResponse.fromUserId());
+                        User payee = userMap.get(settlementResponse.toUserId());
+
+                        if (payer == null || payee == null) {
+                                throw new ResourceNotFoundException(
+                                                "Settlement participant could not be resolved for group: "
+                                                                + group.getId());
+                        }
+
+                        Settlement settlement = new Settlement();
+                        settlement.setGroup(group);
+                        settlement.setPayer(payer);
+                        settlement.setPayee(payee);
+                        settlement.setAmount(settlementResponse.amount());
+                        settlement.setCreatedAt(LocalDateTime.now());
+                        settlement.setIsSettled(false);
+                        settlementRepository.save(settlement);
+                }
         }
 
         /**
@@ -100,7 +128,7 @@ public class SettlementService {
          * @return SettlementDetailResponse containing settlements involving the user
          * @throws ResourceNotFoundException if group or user not found
          */
-        @Transactional(readOnly = true)
+        @Transactional
         public SettlementDetailResponse getUserSettlements(UUID groupId, UUID userId) {
                 // Validate group exists
                 groupRepository.findById(groupId)
@@ -140,17 +168,42 @@ public class SettlementService {
 
                 Settlement savedSettlement = settlementRepository.save(settlement);
 
-                // Publish event
-                SettlementCompletedEvent event = new SettlementCompletedEvent(
-                                this,
-                                savedSettlement.getId(),
+                publishNotification(
+                                "SETTLEMENT_COMPLETED",
                                 savedSettlement.getPayer().getId(),
+                                savedSettlement.getGroup().getId(),
+                                "Settlement Completed",
+                                String.format("You have settled $%.2f with %s.",
+                                                savedSettlement.getAmount(),
+                                                savedSettlement.getPayee().getName()),
+                                savedSettlement.getAmount());
+
+                publishNotification(
+                                "SETTLEMENT_RECEIVED",
                                 savedSettlement.getPayee().getId(),
-                                savedSettlement.getAmount(),
-                                savedSettlement.getPayer().getName(),
-                                savedSettlement.getPayee().getName());
-                eventPublisher.publishEvent(event);
+                                savedSettlement.getGroup().getId(),
+                                "Settlement Received",
+                                String.format("%s has settled $%.2f with you.",
+                                                savedSettlement.getPayer().getName(),
+                                                savedSettlement.getAmount()),
+                                savedSettlement.getAmount());
 
                 log.info("Settlement {} marked as completed", settlementId);
+        }
+
+        private void publishNotification(String eventType, UUID userId, UUID groupId, String title,
+                        String message, BigDecimal amount) {
+                NotificationMessage notificationMessage = new NotificationMessage(
+                                eventType,
+                                userId,
+                                groupId,
+                                title,
+                                message,
+                                amount);
+
+                rabbitTemplate.convertAndSend(
+                                RabbitMqConfig.EXCHANGE_NAME,
+                                RabbitMqConfig.NOTIFICATION_ROUTING_KEY,
+                                notificationMessage);
         }
 }
