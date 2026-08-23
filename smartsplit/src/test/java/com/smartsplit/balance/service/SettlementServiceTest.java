@@ -17,7 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
@@ -53,7 +53,7 @@ class SettlementServiceTest {
     private SettlementRepository settlementRepository;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private RabbitTemplate rabbitTemplate;
 
     @InjectMocks
     private SettlementService settlementService;
@@ -96,6 +96,44 @@ class SettlementServiceTest {
 
         assertEquals(1, response.settlements().size());
         verify(settlementRepository, times(1)).save(any(Settlement.class));
+    }
+
+    @Test
+    void settlePaymentPublishesRabbitMqNotification() {
+        UUID settlementId = UUID.randomUUID();
+        UUID payerId = UUID.randomUUID();
+        UUID payeeId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("25.00");
+
+        Settlement settlement = new Settlement();
+        settlement.setId(settlementId);
+        settlement.setAmount(amount);
+        settlement.setIsSettled(false);
+
+        Group group = new Group();
+        group.setId(UUID.randomUUID());
+        settlement.setGroup(group);
+
+        User payer = new User();
+        payer.setId(payerId);
+        payer.setName("Alice");
+
+        User payee = new User();
+        payee.setId(payeeId);
+        payee.setName("Bob");
+
+        settlement.setPayer(payer);
+        settlement.setPayee(payee);
+
+        when(settlementRepository.findByIdAndIsSettledFalse(settlementId)).thenReturn(Optional.of(settlement));
+        when(settlementRepository.save(any(Settlement.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        settlementService.settlePayment(settlementId);
+
+        verify(rabbitTemplate, times(2)).convertAndSend(
+                org.mockito.ArgumentMatchers.eq("smartsplit.exchange"),
+                org.mockito.ArgumentMatchers.eq("smartsplit.notification"),
+                org.mockito.ArgumentMatchers.any(com.smartsplit.notification.messaging.NotificationMessage.class));
     }
 
     @Test

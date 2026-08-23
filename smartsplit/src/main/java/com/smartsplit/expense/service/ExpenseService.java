@@ -11,14 +11,15 @@ import com.smartsplit.expense.strategy.SplitStrategyFactory;
 import com.smartsplit.exception.BadRequestException;
 import com.smartsplit.exception.ResourceNotFoundException;
 import com.smartsplit.group.Group;
+import com.smartsplit.group.GroupMember;
 import com.smartsplit.group.repository.GroupMemberRepository;
 import com.smartsplit.group.repository.GroupRepository;
-import com.smartsplit.notification.event.ExpenseCreatedEvent;
-import com.smartsplit.notification.event.ExpenseUpdatedEvent;
+import com.smartsplit.config.RabbitMqConfig;
+import com.smartsplit.notification.messaging.NotificationMessage;
 import com.smartsplit.user.User;
 import com.smartsplit.user.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +41,7 @@ public class ExpenseService {
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final SplitStrategyFactory splitStrategyFactory;
-    private final ApplicationEventPublisher eventPublisher;
+    private final RabbitTemplate rabbitTemplate;
 
     @Transactional
     public ExpenseResponse createExpense(ExpenseRequest request) {
@@ -61,16 +62,21 @@ public class ExpenseService {
 
         Expense savedExpense = expenseRepository.save(expense);
 
-        // Publish event
-        ExpenseCreatedEvent event = new ExpenseCreatedEvent(
-                this,
-                savedExpense.getId(),
-                savedExpense.getDescription(),
-                savedExpense.getAmount(),
-                savedExpense.getPaidBy().getId(),
-                savedExpense.getGroup().getId(),
-                savedExpense.getPaidBy().getName());
-        eventPublisher.publishEvent(event);
+        List<GroupMember> groupMembers = groupMemberRepository.findByGroupId(savedExpense.getGroup().getId());
+        for (GroupMember member : groupMembers) {
+            if (!member.getUser().getId().equals(savedExpense.getPaidBy().getId())) {
+                publishNotification(
+                        "EXPENSE_CREATED",
+                        member.getUser().getId(),
+                        savedExpense.getGroup().getId(),
+                        "New Expense Added",
+                        String.format("%s added a new expense: %s for $%.2f in the group.",
+                                savedExpense.getPaidBy().getName(),
+                                savedExpense.getDescription(),
+                                savedExpense.getAmount()),
+                        savedExpense.getAmount());
+            }
+        }
 
         return mapToResponse(savedExpense);
     }
@@ -109,16 +115,21 @@ public class ExpenseService {
 
         Expense updatedExpense = expenseRepository.save(expense);
 
-        // Publish event
-        ExpenseUpdatedEvent event = new ExpenseUpdatedEvent(
-                this,
-                updatedExpense.getId(),
-                updatedExpense.getDescription(),
-                updatedExpense.getAmount(),
-                updatedExpense.getPaidBy().getId(),
-                updatedExpense.getGroup().getId(),
-                updatedExpense.getPaidBy().getName());
-        eventPublisher.publishEvent(event);
+        List<GroupMember> groupMembers = groupMemberRepository.findByGroupId(updatedExpense.getGroup().getId());
+        for (GroupMember member : groupMembers) {
+            if (!member.getUser().getId().equals(updatedExpense.getPaidBy().getId())) {
+                publishNotification(
+                        "EXPENSE_UPDATED",
+                        member.getUser().getId(),
+                        updatedExpense.getGroup().getId(),
+                        "Expense Updated",
+                        String.format("%s updated an expense: %s for $%.2f in the group.",
+                                updatedExpense.getPaidBy().getName(),
+                                updatedExpense.getDescription(),
+                                updatedExpense.getAmount()),
+                        updatedExpense.getAmount());
+            }
+        }
 
         return mapToResponse(updatedExpense);
     }
@@ -128,6 +139,22 @@ public class ExpenseService {
         Expense expense = expenseRepository.findById(expenseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found with id: " + expenseId));
         expenseRepository.delete(expense);
+    }
+
+    private void publishNotification(String eventType, UUID userId, UUID groupId, String title, String message,
+            BigDecimal amount) {
+        NotificationMessage notificationMessage = new NotificationMessage(
+                eventType,
+                userId,
+                groupId,
+                title,
+                message,
+                amount);
+
+        rabbitTemplate.convertAndSend(
+                RabbitMqConfig.EXCHANGE_NAME,
+                RabbitMqConfig.NOTIFICATION_ROUTING_KEY,
+                notificationMessage);
     }
 
     private void validateBasicRequest(ExpenseRequest request) {

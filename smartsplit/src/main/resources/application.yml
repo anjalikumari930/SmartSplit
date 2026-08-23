@@ -2,6 +2,18 @@ spring:
   application:
     name: smartsplit
 
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 3s
+          max-attempts: 5
+
   datasource:
     url: jdbc:postgresql://localhost:5432/smartsplit
     username: postgres
