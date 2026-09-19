@@ -25,14 +25,14 @@ import java.util.UUID;
  * REST Controller for Balance and Settlement operations.
  * 
  * Endpoints:
- * - GET /groups/{groupId}/balances - Get all balances in group
- * - GET /groups/{groupId}/balances/{userId} - Get user balance in group
- * - GET /groups/{groupId}/settlements - Get optimized settlement plan
- * - GET /groups/{groupId}/settlements/{userId} - Get user's settlements
+ * - GET /api/groups/{groupId}/balances - Get all balances in group
+ * - GET /api/groups/{groupId}/balances/{userId} - Get user balance in group
+ * - GET /api/groups/{groupId}/settlements - Get optimized settlement plan
+ * - GET /api/groups/{groupId}/settlements/{userId} - Get user's settlements
  */
 @Slf4j
 @RestController
-@RequestMapping("/groups/{groupId}")
+@RequestMapping("/api/groups/{groupId}")
 @RequiredArgsConstructor
 @Tag(name = "Balance & Settlement", description = "Balance and settlement calculation endpoints")
 public class BalanceController {

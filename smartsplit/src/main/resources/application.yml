@@ -13,6 +13,7 @@ spring:
           enabled: true
           initial-interval: 3s
           max-attempts: 5
+        default-requeue-rejected: false
 
   datasource:
     url: jdbc:postgresql://localhost:5432/smartsplit
