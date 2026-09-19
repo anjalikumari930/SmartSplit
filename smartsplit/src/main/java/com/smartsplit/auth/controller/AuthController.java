@@ -1,5 +1,6 @@
 package com.smartsplit.auth.controller;
 
+import com.smartsplit.auth.dto.AuthResponse;
 import com.smartsplit.user.UserService;
 import com.smartsplit.user.dto.SignupRequest;
 import com.smartsplit.user.dto.LoginRequest;
@@ -32,8 +33,8 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "Login successful, returns JWT token")
     @ApiResponse(responseCode = "401", description = "Invalid email or password")
     @ApiResponse(responseCode = "404", description = "User not found")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
         String token = userService.login(request);
-        return ResponseEntity.ok(token);
+        return ResponseEntity.ok(new AuthResponse(token));
     }
 }
